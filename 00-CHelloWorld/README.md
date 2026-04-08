@@ -1,7 +1,5 @@
 # Hola mundo en C
 
-Este repositorio contiene un programa básico en C (`hello.c`).
-
 ## Resultados
 * **Compilador:** GCC
 * **Versión del compilador:** 15.1.0
