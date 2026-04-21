@@ -1,4 +1,5 @@
-# Hola mundo en C
+# Tp 0
+## Primero programa en C
 
 ## Resultados
 * **Compilador:** GCC
