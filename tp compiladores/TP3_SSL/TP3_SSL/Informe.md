@@ -4,6 +4,7 @@
 **Materia:** Sintaxis y Semántica de los Lenguajes (SSL)  
 **Curso:** K2002 · **Ciclo lectivo:** 2026  
 **Docente:** Ing. Roxana Leituz  
+**Repositorio:** [https://github.com/mmaxicolo/TP3-SSL](https://github.com/mmaxicolo/TP3-SSL)  
 **Integrantes:**
 * Nicole Brunstein
 * Ariana Castro
@@ -91,8 +92,6 @@ El código fuente del compilador descendente recursivo (ASDR) de Micro provisto 
 cd parte2
 gcc -std=gnu99 -Wall micro_c.c -o micro_c
 ```
-
-> **Nota sobre los argumentos de entrada:** El programa principal verifica que el nombre de archivo pasado por línea de comandos tenga extensión `.m` y una longitud máxima de 20 caracteres (`TAMNOM = 20 + 1`).
 
 ---
 
