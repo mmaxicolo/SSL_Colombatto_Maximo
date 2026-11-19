@@ -3,7 +3,13 @@
 **Universidad Tecnológica Nacional · Facultad Regional Buenos Aires (UTN FRBA)**  
 **Materia:** Sintaxis y Semántica de los Lenguajes (SSL)  
 **Curso:** K2002 · **Ciclo lectivo:** 2026  
-**Integrantes:** *[Completar con Nombre, Apellido y Legajo de los integrantes del grupo]*
+**Docente:** Ing. Roxana Leituz  
+**Integrantes:**
+* Nicole Brunstein
+* Ariana Castro
+* Máximo Colombatto
+* Federico Dimentstein
+* Agustina Marques Serra
 
 ---
 
