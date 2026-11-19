@@ -1,5 +1,4 @@
 %{
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,10 +21,9 @@ static Simbolo *tabla;
 
 static Simbolo *agregar(Simbolo *lista, char *nombre);
 static void liberar(Simbolo *lista);
+static Simbolo *buscar(const char *nombre);
 static void inicializar(char *nombre);
-static int verificar_longitud(const char *nombre, int linea);
 static int verificar_uso(const char *nombre, int linea);
-static int verificar_constante(const char *texto, int linea);
 %}
 
 %locations
@@ -35,8 +33,8 @@ static int verificar_constante(const char *texto, int linea);
     struct simbolo *lista;
 }
 
-%token INICIO FIN LEER ESCRIBIR ASIGNACION
-%token <texto> ID CONSTANTE
+%token INICIO FIN LEER ESCRIBIR ASIGNACION CONSTANTE
+%token <texto> ID
 %type <valido> expresion primaria
 %type <lista> lista_identificadores
 %destructor { free($$); } <texto>
@@ -55,8 +53,7 @@ lista_sentencias:
 sentencia:
     ID ASIGNACION expresion ';'
     {
-        int id_valido = verificar_longitud($1, @1.first_line);
-        if (id_valido && $3)
+        if ($3)
             inicializar($1);
         else
             free($1);
@@ -75,24 +72,8 @@ sentencia:
 ;
 
 lista_identificadores:
-    ID
-    {
-        if (verificar_longitud($1, @1.first_line))
-            $$ = agregar(NULL, $1);
-        else {
-            free($1);
-            $$ = NULL;
-        }
-    }
-  | lista_identificadores ',' ID
-    {
-        if (verificar_longitud($3, @3.first_line))
-            $$ = agregar($1, $3);
-        else {
-            free($3);
-            $$ = $1;
-        }
-    }
+    ID                            { $$ = agregar(NULL, $1); }
+  | lista_identificadores ',' ID  { $$ = agregar($1, $3); }
 ;
 
 lista_expresiones:
@@ -111,8 +92,8 @@ operador:
 ;
 
 primaria:
-    ID          { $$ = verificar_longitud($1, @1.first_line) && verificar_uso($1, @1.first_line); free($1); }
-  | CONSTANTE   { $$ = verificar_constante($1, @1.first_line); free($1); }
+    ID                { $$ = verificar_uso($1, @1.first_line); free($1); }
+  | CONSTANTE         { $$ = 1; }
   | '(' expresion ')' { $$ = $2; }
 ;
 %%
@@ -148,6 +129,7 @@ static Simbolo *buscar(const char *nombre)
     return NULL;
 }
 
+/* Rutina semantica 1: registra un identificador inicializado en la Tabla de Simbolos */
 static void inicializar(char *nombre)
 {
     if (buscar(nombre) == NULL)
@@ -156,34 +138,13 @@ static void inicializar(char *nombre)
         free(nombre);
 }
 
-static int verificar_longitud(const char *nombre, int linea)
-{
-    if (strlen(nombre) <= 32)
-        return 1;
-    fprintf(stderr, "Error semantico (linea %d): el identificador '%s' excede los 32 caracteres.\n",
-            linea, nombre);
-    ++errores_semanticos;
-    return 0;
-}
-
+/* Rutina semantica 2: verifica que un identificador usado en una expresion exista en la Tabla de Simbolos */
 static int verificar_uso(const char *nombre, int linea)
 {
     if (buscar(nombre) != NULL)
         return 1;
     fprintf(stderr, "Error semantico (linea %d): '%s' se usa antes de inicializarse.\n",
             linea, nombre);
-    ++errores_semanticos;
-    return 0;
-}
-
-static int verificar_constante(const char *texto, int linea)
-{
-    errno = 0;
-    long long valor = strtoll(texto, NULL, 10);
-    if (errno != ERANGE && valor <= 2147483647LL)
-        return 1;
-    fprintf(stderr, "Error semantico (linea %d): la constante '%s' excede 2147483647.\n",
-            linea, texto);
     ++errores_semanticos;
     return 0;
 }

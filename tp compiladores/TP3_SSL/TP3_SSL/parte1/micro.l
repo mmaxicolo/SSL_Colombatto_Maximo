@@ -35,7 +35,7 @@ IDENT       {LETRA}({LETRA}|{DIGITO})*
 "escribir"  { return ESCRIBIR; }
 ":="        { return ASIGNACION; }
 {IDENT}     { yylval.texto = copiar_lexema(); return ID; }
-{DIGITO}+   { yylval.texto = copiar_lexema(); return CONSTANTE; }
+{DIGITO}+   { return CONSTANTE; }
 [()+,;-]    { return yytext[0]; }
 [ \t\r\n]+  { /* Separadores entre tokens. */ }
 .           {

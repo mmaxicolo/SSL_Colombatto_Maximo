@@ -15,20 +15,19 @@ Se implementó un analizador léxico, sintáctico y semántico completo para la 
 
 1. **Análisis léxico ([micro.l](parte1/micro.l)):** Flex lee el flujo de caracteres y agrupa los lexemas en tokens. Las reglas para las palabras reservadas (`inicio`, `fin`, `leer`, `escribir`) se ubican antes de la regla general de identificadores (`{LETRA}({LETRA}|{DIGITO})*`) para que tengan prioridad en caso de coincidencia de igual longitud, mientras que la regla de coincidencia más larga asegura que un lexema como `inicio2` sea reconocido correctamente como `ID`. Los espacios, tabulaciones y saltos de línea actúan como separadores y actualizan automáticamente el contador `yylineno`.
 2. **Análisis sintáctico ([micro.y](parte1/micro.y)):** Bison solicita tokens bajo demanda invocando a `yylex()` y construye el árbol de derivación en forma ascendente (LALR(1)). Las repeticiones expresadas con llaves en la EBNF de cátedra se modelan mediante **recursión a izquierda** (`lista_sentencias`, `lista_identificadores`, `lista_expresiones` y `expresion`), lo que garantiza asociatividad a izquierda para la suma y la resta con consumo constante de pila, mientras que la regla `primaria -> '(' expresion ')'` permite alterar la precedencia mediante paréntesis.
-3. **Comunicación entre Flex y Bison:** Flex incluye el encabezado generado `micro.tab.h` para compartir la codificación de los tokens, el tipo `%union` (`yylval`) y la estructura de posiciones (`yylloc`). Para los tokens con carga semántica (`ID` y `CONSTANTE`), Flex duplica dinámicamente el lexema en `yylval.texto`, y Bison libera de forma segura dicha memoria tanto en las reducciones normales como durante el descarte de símbolos por error mediante directivas `%destructor`.
-4. **Análisis semántico:** Las acciones semánticas se ejecutan al reducir cada producción relevante. Se mantiene una Tabla de Símbolos dinámica que registra los identificadores que ya recibieron un valor válido (mediante `leer` o mediante el lado izquierdo de una asignación cuya expresión derecha resultó semánticamente válida) y se invocan tres rutinas semánticas de validación estática.
+3. **Comunicación entre Flex y Bison:** Flex incluye el encabezado generado `micro.tab.h` para compartir la codificación de los tokens, el tipo `%union` (`yylval`) y la estructura de posiciones (`yylloc`). Para el token `ID`, Flex duplica dinámicamente el lexema en `yylval.texto`, y Bison libera de forma segura dicha memoria tanto en las reducciones normales como durante el descarte de símbolos por error mediante directivas `%destructor`.
+4. **Análisis semántico:** Las acciones semánticas se ejecutan al reducir cada producción relevante. Se mantiene una Tabla de Símbolos dinámica operada por dos rutinas semánticas principales: una encargada de registrar los identificadores inicializados y otra encargada de validar que todo identificador usado en una expresión haya sido inicializado previamente.
 
 ---
 
 ### 2. Rutinas semánticas implementadas
 
-Se implementaron **3 rutinas semánticas** en [micro.y](parte1/micro.y) para controlar restricciones sensibles al contexto y de representación que la Gramática Independiente del Contexto (GIC) no puede expresar por sí sola:
+Se implementaron **2 rutinas semánticas** en [micro.y](parte1/micro.y) que interactúan con la Tabla de Símbolos para controlar restricciones sensibles al contexto que la Gramática Independiente del Contexto (GIC) no puede expresar por sí sola:
 
-| Rutina semántica | Qué verifica | Ejemplo rechazado |
+| Rutina semántica | Qué realiza | Momento en que actúa |
 | :--- | :--- | :--- |
-| `verificar_uso` | Todo identificador utilizado como operando dentro de una expresión debe haber recibido previamente un valor mediante una sentencia `leer(...)` o una asignación `:=` válida. | `escribir(total);` sin inicialización previa de `total`. |
-| `verificar_constante` | Toda secuencia de dígitos debe poder representarse dentro del rango de un entero de 32 bits con signo (`<= 2147483647`). | `escribir(2147483648);` |
-| `verificar_longitud` | Todo identificador debe respetar la longitud máxima de 32 caracteres estipulada en la especificación del lenguaje Micro (`TAMLEX = 32 + 1`). | `acumuladorGeneralDeResultadosFinales := 10;` (36 caracteres). |
+| `inicializar` | Registra un identificador en la Tabla de Símbolos (si aún no estaba registrado) para dejar constancia de que ya posee un valor válido. | Al reducirse una lectura `leer(lista_identificadores);` o una asignación `ID := expresion;` cuya expresión derecha sea semánticamente válida. |
+| `verificar_uso` | Consulta la Tabla de Símbolos cada vez que un identificador aparece como operando dentro de una expresión. Si no se encuentra registrado, emite un error semántico personalizado. | Al reducirse `primaria -> ID` (por ejemplo, `escribir(total);` sin haber leído ni asignado `total` previamente). |
 
 ---
 
@@ -36,7 +35,7 @@ Se implementaron **3 rutinas semánticas** en [micro.y](parte1/micro.y) para con
 
 * **Error léxico personalizado:** Si el escáner encuentra un carácter ajeno al alfabeto de Micro (como `@`), emite por `stderr` el diagnóstico indicando el número de línea exacto y el carácter inválido (`Error lexico (linea N): caracter no reconocido '...'`), incrementa el contador de errores léxicos y retorna el símbolo especial `YYerror` a Bison para evitar que ese mismo carácter provoque un falso mensaje de error sintáctico adicional.
 * **Error sintáctico personalizado:** Se redefinió `yyerror()` utilizando `%locations` (`yylloc.first_line`) y `yytext` para informar explícitamente qué token inesperado rompió la estructura gramatical y en qué línea ocurrió (`Error sintactico (linea N): token inesperado '...'`), distinguiendo también el caso de fin de archivo prematuro (`fin de archivo`). Además, la producción `sentencia -> error ';'` con `yyerrok` implementa recuperación en modo pánico sincronizando en el siguiente punto y coma para continuar analizando el resto del archivo.
-* **Error semántico personalizado:** Cada rutina semántica informa la línea exacta, el lexema involucrado y la causa específica del rechazo (`se usa antes de inicializarse`, `la constante '...' excede 2147483647` o `el identificador '...' excede los 32 caracteres`).
+* **Error semántico personalizado:** Cuando `verificar_uso` detecta un identificador que no figura en la Tabla de Símbolos, informa la línea exacta y el nombre de la variable (`Error semantico (linea N): '...' se usa antes de inicializarse.`).
 
 ---
 
@@ -57,8 +56,6 @@ Para ejecutar los casos de prueba incluidos en `parte1/pruebas/`:
 ./micro pruebas/02_lexico.micro
 ./micro pruebas/03_sintactico.micro
 ./micro pruebas/04_semantico_uso.micro
-./micro pruebas/05_semantico_constante.micro
-./micro pruebas/06_semantico_longitud.micro
 ```
 
 El ejecutable devuelve código de salida `0` si el programa Micro es válido, `1` si es rechazado por errores léxicos, sintácticos o semánticos, y `2` ante errores de invocación o memoria.
@@ -67,14 +64,12 @@ El ejecutable devuelve código de salida `0` si el programa Micro es válido, `1
 
 ### 5. Pruebas y pantallas (Parte 1)
 
-| Archivo de prueba | Contenido (`.micro`) | Salida obtenida |
+| Archivo de prueba | Caso evaluado | Contenido (`.micro`) |
 | :--- | :--- | :--- |
-| [01_correcto.micro](parte1/pruebas/01_correcto.micro) | `inicio`<br>`  leer(a, b);`<br>`  cc := a + (b - 2);`<br>`  escribir(cc, a + 4);`<br>`fin` | `Programa Micro correcto.` |
-| [02_lexico.micro](parte1/pruebas/02_lexico.micro) | `inicio`<br>`  a := 2 @ 3;`<br>`  escribir(1);`<br>`fin` | `Error lexico (linea 2): caracter no reconocido '@'.`<br>`Programa rechazado. Lexicos: 1 \| Sintacticos: 0 \| Semanticos: 0` |
-| [03_sintactico.micro](parte1/pruebas/03_sintactico.micro) | `inicio`<br>`  a := (2 + );`<br>`  escribir(1);`<br>`fin` | `Error sintactico (linea 2): token inesperado ')'.`<br>`Programa rechazado. Lexicos: 0 \| Sintacticos: 1 \| Semanticos: 0` |
-| [04_semantico_uso.micro](parte1/pruebas/04_semantico_uso.micro) | `inicio`<br>`  escribir(total);`<br>`fin` | `Error semantico (linea 2): 'total' se usa antes de inicializarse.`<br>`Programa rechazado. Lexicos: 0 \| Sintacticos: 0 \| Semanticos: 1` |
-| [05_semantico_constante.micro](parte1/pruebas/05_semantico_constante.micro) | `inicio`<br>`  escribir(2147483648);`<br>`fin` | `Error semantico (linea 2): la constante '2147483648' excede 2147483647.`<br>`Programa rechazado. Lexicos: 0 \| Sintacticos: 0 \| Semanticos: 1` |
-| [06_semantico_longitud.micro](parte1/pruebas/06_semantico_longitud.micro) | `inicio`<br>`  acumuladorGeneralDeResultadosFinales := 10;`<br>`fin` | `Error semantico (linea 2): el identificador 'acumuladorGeneralDeResultadosFinales' excede los 32 caracteres.`<br>`Programa rechazado. Lexicos: 0 \| Sintacticos: 0 \| Semanticos: 1` |
+| [01_correcto.micro](parte1/pruebas/01_correcto.micro) | Programa válido | `inicio`<br>`  leer(a, b);`<br>`  cc := a + (b - 2);`<br>`  escribir(cc, a + 4);`<br>`fin` |
+| [02_lexico.micro](parte1/pruebas/02_lexico.micro) | Error léxico (`@`) | `inicio`<br>`  a := 2 @ 3;`<br>`  escribir(1);`<br>`fin` |
+| [03_sintactico.micro](parte1/pruebas/03_sintactico.micro) | Error sintáctico (`)`) | `inicio`<br>`  a := (2 + );`<br>`  escribir(1);`<br>`fin` |
+| [04_semantico_uso.micro](parte1/pruebas/04_semantico_uso.micro) | Error semántico (variable sin inicializar) | `inicio`<br>`  escribir(total);`<br>`fin` |
 
 ![Ejecución de pruebas — Parte 1](img/parte1_pruebas.png)
 
