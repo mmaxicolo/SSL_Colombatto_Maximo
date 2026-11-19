@@ -99,7 +99,7 @@ gcc -std=gnu99 -Wall micro_c.c -o micro_c
 
 Se prepararon los 3 ejemplos solicitados en la carpeta `parte2/pruebas/`:
 
-#### Ejemplo 1: Programa correcto ([parte2/pruebas/01_ok.m](parte2/pruebas/01_ok.m))
+#### Ejemplo 1: Programa correcto ([parte2/pruebas/01_correcto.m](parte2/pruebas/01_correcto.m))
 ```micro
 inicio
     leer(a, b);
@@ -107,44 +107,16 @@ inicio
     escribir(cc, a + 4);
 fin
 ```
-**Salida de compilación (instrucciones de Máquina Virtual):**
-```text
-Declara a,Entera,
-Read a,Entera,
-Declara b,Entera,
-Read b,Entera,
-Declara cc,Entera,
-Declara Temp&1,Entera,
-Restar b,2,Temp&1
-Declara Temp&2,Entera,
-Sumar a,Temp&1,Temp&2
-Almacena Temp&2,cc,
-Write cc,Entera,
-Declara Temp&3,Entera,
-Sumar a,4,Temp&3
-Write Temp&3,Entera,
-Detiene ,,
-```
 
-#### Ejemplo 2: Programa con error léxico ([parte2/pruebas/02_lex.m](parte2/pruebas/02_lex.m))
+#### Ejemplo 2: Programa con error léxico ([parte2/pruebas/02_lexico.m](parte2/pruebas/02_lexico.m))
 ```micro
 inicio
     a := 2 @ 3;
     escribir(a);
 fin
 ```
-**Salida obtenida:**
-```text
-Declara a,Entera,
-Error Lexico
-Almacena 2,a,
-Error Sintactico
-Error Sintactico
-Error Sintactico
-Detiene ,,
-```
 
-#### Ejemplo 3: Programa con error sintáctico y semántico ([parte2/pruebas/03_sinsem.m](parte2/pruebas/03_sinsem.m))
+#### Ejemplo 3: Programa con error sintáctico y semántico ([parte2/pruebas/03_sintacticoSemantico.m](parte2/pruebas/03_sintacticoSemantico.m))
 ```micro
 inicio
     leer(10);
@@ -152,19 +124,8 @@ inicio
     escribir(total);
 fin
 ```
-**Salida obtenida:**
-```text
-Error Sintactico
-Declara 10,Entera,
-Read 10,Entera,
-Declara a,Entera,
-Declara Temp&1,Entera,
-Sumar 2, ,Temp&1
-Almacena Temp&1,a,
-Declara total,Entera,
-Write total,Entera,
-Detiene ,,
-```
+
+A continuación se muestra la captura de la ejecución real de las pruebas en la terminal de MinGW64/Bash:
 
 ![Ejecución de pruebas — Parte 2](img/parte2_pruebas.png)
 
@@ -172,15 +133,15 @@ Detiene ,,
 
 ### 3. Análisis en lenguaje natural del funcionamiento ante cada error
 
-#### A. Cómo funciona y por qué se produce el Error Léxico (`02_lex.m`)
+#### A. Cómo funciona y por qué se produce el Error Léxico (`02_lexico.m`)
 El analizador léxico del compilador en C funciona como un Autómata Finito Determinístico guiado por una matriz de transición de estados en la que cada fila representa el estado actual del reconocimiento y cada columna clasifica el carácter leído del archivo (letra, dígito, operador, paréntesis, espacio, fin de archivo u «otro»).
 
 Al analizar la sentencia `a := 2 @ 3;`, el compilador reconoce sin inconvenientes el identificador `a` (declarándolo en la Tabla de Símbolos), el operador de asignación `:=` y la constante `2`. Sin embargo, cuando el analizador sintáctico de expresiones consulta cuál es el próximo token para saber si sigue un operador `+` o `-`, el escáner lee el carácter `@`. Como `@` no pertenece al alfabeto válido del lenguaje Micro, cae en la categoría de carácter desconocido («otro») estando en el estado inicial del autómata. La tabla de transiciones conduce directamente al estado de rechazo léxico y el compilador informa **`Error Lexico`**.
 
 Lo más interesante es el efecto colateral que se observa inmediatamente después: como el compilador en C no descarta la sentencia ni limpia el estado del token fallido cuando ocurre un error léxico, el procedimiento que analiza la expresión interpreta que después del `2` no hay ni un `+` ni un `-`, por lo que da por terminada la expresión prematuramente y emite la instrucción `Almacena 2,a,`. A continuación, cuando la sentencia intenta verificar el punto y coma final obligatorio, se choca primero con el token de error léxico que había quedado pendiente y luego con los tokens remanentes (`3` y `;`) fuera de lugar, provocando una cascada de tres mensajes de **`Error Sintactico`** consecutivos.
 
-#### B. Cómo funciona y por qué se producen los Errores Sintácticos y Semánticos (`03_sinsem.m`)
-El compilador en C utiliza un **Análisis Sintáctico Descendente Recursivo (ASDR)** donde cada símbolo no terminal de la gramática tiene su propio procedimiento en C, y las decisiones se toman de forma predictiva observando un único token por adelantado (gramática LL(1)). A su vez, las rutinas semánticas encargadas de administrar la Tabla de Símbolos y emitir el código de la Máquina Virtual están intercaladas de forma rígida dentro de esos procedimientos. En `03_sinsem.m` se observan tres fenómenos clave:
+#### B. Cómo funciona y por qué se producen los Errores Sintácticos y Semánticos (`03_sintacticoSemantico.m`)
+El compilador en C utiliza un **Análisis Sintáctico Descendente Recursivo (ASDR)** donde cada símbolo no terminal de la gramática tiene su propio procedimiento en C, y las decisiones se toman de forma predictiva observando un único token por adelantado (gramática LL(1)). A su vez, las rutinas semánticas encargadas de administrar la Tabla de Símbolos y emitir el código de la Máquina Virtual están intercaladas de forma rígida dentro de esos procedimientos. En `03_sintacticoSemantico.m` se observan tres fenómenos clave:
 
 1. **Interacción entre error sintáctico y acción semántica inválida en `leer(10);`:**  
    La gramática establece que la instrucción `leer` debe recibir una lista de identificadores (variables donde almacenar los valores ingresados). Cuando el procedimiento correspondiente espera hacer coincidir un identificador pero el escáner le entrega la constante numérica `10`, la verificación sintáctica falla e imprime **`Error Sintactico`**. Sin embargo, el procedimiento no detiene su ejecución tras el fallo sintáctico, sino que invoca inmediatamente a la rutina semántica de procesamiento de identificadores tomando el texto crudo que quedó en el buffer (`"10"`). Como resultado de esta falta de aislamiento entre sintaxis y semántica, el compilador da de alta el número `"10"` en la Tabla de Símbolos como si fuera el nombre de una variable entera (`Declara 10,Entera,`) y emite la instrucción inválida `Read 10,Entera,`.

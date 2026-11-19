@@ -6,7 +6,7 @@
 #define NUMESTADOS 15
 #define NUMCOLS 13
 #define TAMLEX 32+1
-#define TAMNOM 20+1
+#define TAMNOM 100+1
 
 /******************Declaraciones Globales*************************/
 FILE * in;
@@ -68,13 +68,13 @@ void Comenzar(void);
 void Terminar(void);
 void Asignar(REG_EXPRESION izq, REG_EXPRESION der);
 
-/***************************Programa Principal************************/
+//Programa Principal
 int main(int argc, char * argv[])
 {
     TOKEN tok;
     char nomArchi[TAMNOM];
     int l;
-    /***************************Se abre el Archivo Fuente******************/
+    //Se abre el Archivo Fuente
     // verifica errores posibles
     if ( argc == 1 ) {
         printf("Debe ingresar el nombre del archivo fuente (en lenguaje Micro) en la linea de comandos\n");
@@ -99,14 +99,14 @@ int main(int argc, char * argv[])
         printf("No se pudo abrir archivo fuente\n");
         return -1; // no pudo abrir archivo
     }
-    /*************************Inicio Compilacion***************************/
+    //Inicio Compilacion
     Objetivo();
-    /**************************Se cierra el Archivo Fuente******************/
+    // Se cierra el Archivo Fuente
     fclose(in);
     return 0;
 }
 
-/**********Procedimientos de Analisis Sintactico (PAS) *****************/
+//Procedimientos de Analisis Sintactico (PAS)
 
 void Objetivo(void)
 {
@@ -135,9 +135,9 @@ void ListaSentencias(void)
                 Sentencia();
                 break;
             default : return; // si no es sentencia termina la funcion
-        } // fin del switch
-    } // fin del while
-} // fin funcion
+        } 
+    } 
+}
 
 void Sentencia(void) {
     TOKEN tok = ProximoToken();
